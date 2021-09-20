@@ -6,35 +6,27 @@ permalink: index.html  # Is the only page that doesn't follow the pattern /:path
 
 {% include gh_variables.html %}
 
-Attendees will learn how to read, filter, and interrogate variant calls that are in VCF (Variant Call Format) format with Bioconductor packages in R. Analyses may include some or all of the following topics: assessing minor allele frequency, missing data rate, heterozygosity, and/or linkage disequilibrium; working with genome annotations as TxDb objects; discovering what genes are near SNPs of interest; identifying functional consequences of variants.  Although we will not perform genome-wide association studies (GWAS) in this workshop, we will cover many tasks that one might perform before or after GWAS.
+Attendees will learn how to FILL THIS IN LATER!!!
 
 **Before the workshop starts, please follow the [setup](setup.md) instructions.**
 
-This workshop was developed by Lindsay Clark at HPCBio, Roy J. Carver
+This workshop was developed by Jessica Holmes at HPCBio, Roy J. Carver
 Biotechnology Center, University of Illinois, Urbana-Champaign, using a
 website template developed by The Carpentries.
-
-To register to attend this workshop December 2 & 4, 2020, please see our
-[Eventbrite page](https://www.eventbrite.com/e/advanced-r-variant-analysis-fall-2020-registration-129018819763).
-Recordings of the workshop are [available on Box](https://uofi.box.com/s/ztwlcx0ky04n8scap12vbi4r6hsspb1k).
 
 For guidelines on how to help improve this lesson,
 please see [the contribution guidelines][contributing].
 
 > ## Prerequisites
 >
-> * **Beginner knowledge of bioinformatics concepts**
->   - Single nucleotide polymorphisms (SNPs)
->   - Genome annotations
->   - Variant and genotype calling
+> * **Beginner knowledge of Linux and high performance computing**
+>   - List things HERE!!!
 > * **Beginner knowledge of R and Bioconductor**
 >   - Installing packages from Bioconductor
 >   - Finding help pages
 >   - Importing data
 >   - Using functions
->   - Indexing and subsetting data
->   - Making simple functions
->   - Scatter plots with ggplot
+>   - List things HERE!!!
 {: .prereq}
 
 
