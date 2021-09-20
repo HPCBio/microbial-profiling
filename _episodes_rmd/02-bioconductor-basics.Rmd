@@ -1,0 +1,349 @@
+---
+source: Rmd
+title: "Bioconductor basics"
+teaching: 50
+exercises: 15
+questions:
+- "What are the Bioconductor classes for the types of data we would find in a VCF?"
+objectives:
+- "Create a GRanges object to indicate regions of the genome that you are interested in."
+- "Load DNA sequences from a reference genome."
+- "Extract assay metadata from the results of an experiment."
+- "Find help pages to learn more about what you can do with this data."
+keypoints:
+- "FaFile creates a pointer to a reference genome file on your computer."
+- "An index file allows quick access to specific information from large files."
+- "GRanges stores positions within a genome for any type of feature (SNP, exon, etc.)"
+- "DNAStringSet stores DNA sequences."
+- "SummarizedExperiment stores the results of a set of assays across a set of samples."
+---
+
+```{r, include=FALSE}
+source("../bin/chunk-options.R")
+knitr_fig_path("02-")
+```
+
+Bioconductor packages are all designed to work together.  This is why, when you
+tried installing five packages, it probably installed dozens of dependencies.
+The benefit is that the same functions are useful across many different
+bioinformatics workflows.  To explore those building blocks, we'll load a few of
+those dependencies.
+
+```{r, message = FALSE, warning = FALSE}
+library(GenomicRanges)
+library(Biostrings)
+library(Rsamtools)
+library(SummarizedExperiment)
+```
+
+We'll also load `magrittr` to make some code more readable.
+
+```{r, message = FALSE, warning = FALSE}
+library(magrittr)
+```
+
+## Reference genome
+
+In the [setup](setup.md), you downloaded and unzipped a reference genome file.
+
+```{r}
+ref_file <- "data/Zm-B73-REFERENCE-GRAMENE-4.0.fa"
+```
+
+You should build an _index_ for the file.  This is another file, ending in
+`.fai`, that indicates where in the file each chromosome starts.  It enables
+quick access to specific regions of the genome.
+
+```{r, eval = FALSE}
+indexFa(ref_file)
+```
+
+Now we can import the reference genome.
+
+```{r}
+mygenome <- FaFile(ref_file)
+```
+
+If we try to print it out:
+
+```{r}
+mygenome
+```
+
+Hmm, we don't see any DNA sequences, just names of files.  We haven't actually
+loaded the data into R, just told R where to look when we want the data.  This
+saves RAM since we don't usually need to analyze the whole genome at once.
+
+We can get some information about the genome:
+
+```{r}
+seqinfo(mygenome)
+```
+
+There are chromosomes, and some smaller contigs.
+
+> ## Challenge: Chromosome names
+>
+> Look at the help page for `seqinfo`.  Can you find a way to view all of the sequence names?
+>
+> > ## Solution
+> >
+> > There is a `seqnames` function.  It doesn't work directly on a `FaFile`
+> > object however.  It works on the `SeqInfo` object returned by `seqinfo`.
+> >
+> > ```{r}
+> > seqnames(seqinfo(mygenome))
+> > ```
+> {: .solution}
+{: .challenge}
+
+## Coordinates within a genome
+
+Any time we want to specify coordinates within a genome, we use a `GRanges`
+object.  This could indicate the locations of anything including SNPs, exons,
+QTL regions, or entire chromosomes.  Somewhat confusingly, every `GRanges`
+object contains an `IRanges` object containing the positions, and then the
+`GRanges` object tags on the chromosome name.  Let's build one from scratch.
+
+```{r}
+myqtl <- GRanges(c("Chr2", "Chr2", "Chr8"),
+                 IRanges(start = c(134620000, 48023000, 150341000),
+                         end   = c(134752000, 48046000, 150372000)))
+myqtl
+```
+
+We can add some extra info, like row names and metadata columns.
+
+```{r}
+names(myqtl) <- c("Yld1", "LA1", "LA2")
+myqtl$Trait <- c("Yield", "Leaf angle", "Leaf angle")
+myqtl
+```
+
+Although this appears two-dimensional like a data frame, if we only want
+certain rows, we index it in a one-dimensional way like a vector.
+
+```{r}
+myqtl[1]
+myqtl["LA2"]
+myqtl[myqtl$Trait == "Leaf angle"]
+```
+
+> ## Handy utility functions
+>
+> See `?IRanges::shift` for some useful functions for manipulating `GRanges`
+> objects.  The `width` function is also helpful if you want to know the size
+> of each range.  The `mcols` function retrieves all metadata columns, like our
+> "Trait" column. Check out `browseVignettes("GenomicRanges")` to learn even more.
+{: .callout}
+
+We can also import our gene annotations in to a `GRanges` object.  This should
+be familiar if you took the HPCBio introductory Bioconductor workshop this
+semester.
+
+```{r readgff}
+gtf0 <- rtracklayer::import("data/Zm-B73-REFERENCE-GRAMENE-4.0_Zm00001d.2.gff3")
+gtf0
+```
+
+Unfortunately, the chromosome names have been shortened and don't match the
+reference genome.  We'll find this problem with VCFs as well.  Here is how
+to fix it.
+
+```{r}
+newnames <- as.character(seqnames(gtf0))
+tofix <- which(!newnames %in% seqnames(seqinfo(mygenome)))
+unique(newnames[tofix])
+newnames[newnames %in% as.character(1:10)] <- paste0("Chr", newnames[newnames %in% as.character(1:10)])
+tofix <- which(!newnames %in% seqnames(seqinfo(mygenome)))
+unique(newnames[tofix])
+```
+
+The mitochondrial genome is in the GFF but not the FASTA, but we will ignore that
+for now.  Continuing on with the fix:
+
+```{r}
+gtf0a <- GRanges(newnames, ranges(gtf0))
+mcols(gtf0a) <- mcols(gtf0)
+gtf0a
+```
+
+We can free up memory by removing `gtf0` now that we don't need it.
+
+```{r}
+rm(gtf0)
+```
+
+> ## Challenge: Subset GFF
+>
+> Make a `GRanges` object called `gtf1` that only contains gene locations, _i.e._
+> it only contains rows where the "type" is "gene".  Be sure to start with our
+> `gtf0a` object.
+>
+> > ## Solution
+> >
+> > ```{r}
+> > gtf1 <- gtf0a[gtf0a$type == "gene"]
+> > gtf1
+> > ```
+> {: .solution}
+{: .challenge}
+
+Here's where things start to get really helpful.  What genes are within our QTL
+ranges?
+
+```{r}
+qtl_genes <- subsetByOverlaps(gtf1, myqtl)
+qtl_genes
+```
+
+Later, when we import a VCF, the positions of the variants within the genome
+will be stored as `GRanges`.
+
+## DNA sequences
+
+Now let's get the sequences for those genes.  You could do this using any
+`GRanges` object.
+
+```{r}
+qtl_genes_seq <- scanFa(mygenome, qtl_genes)
+qtl_genes_seq
+```
+
+This is a `DNAStringSet`, which is how you'll typically find DNA sequences
+represented.  You can do handy things like take the reverse complement, or
+translate to amino acids:
+
+```{r, warning = FALSE}
+reverseComplement(qtl_genes_seq)
+translate(qtl_genes_seq)
+```
+
+Of course, this is the full gene sequence containing exons and introns, so
+we don't get the correct amino acid sequence like we would if we were using
+the CDS.
+
+> ## Extracting transcript sequences
+>
+> If you do want to get the sequences of transcripts or CDS from a genome,
+> see `?GenomicFeatures::extractTranscriptSeqs`.  You would need to import
+> the GFF with `makeTxDbFromGFF` rather than `rtracklayer::import`.
+{: .callout}
+
+If you need to create a `DNAStringSet` from scratch, you can do it directly from
+a character vector.
+
+```{r}
+test_dna <- DNAStringSet(c("AGGG", "TCAGATTTAAC", "TC"))
+test_dna
+```
+
+> ## Bonus Challenge: The whole thing
+>
+> How would you import the full sequence for chromosome 3?
+>
+> > ## Solution
+> >
+> > ```{r}
+> > chr3length <- seqlengths(seqinfo(mygenome))["Chr3"]
+> > chr3range <- GRanges("Chr3", IRanges(start = 1, end = chr3length))
+> > chr3seq <- scanFa(mygenome, chr3range)
+> > ```
+> {: .solution}
+{: .challenge}
+
+```{r, echo = FALSE}
+rm(chr3seq)
+```
+
+When we import data from VCF, the reference and alternative alleles are stored
+in `DNAStringSet`s.
+
+## Experimental results
+
+The `SummarizedExperiment` class contains matrix-like data, with assays in
+rows and samples in columns.  Like much of Bioconductor, it was originally
+designed for microarray data, where there would be many probes on a microarray,
+each representing a gene, and the fluorescence of that probe indicated
+expression levels of the gene in that sample.  However, `SummarizedExperiment`
+is flexible enough to also contain RNA-seq data, or in our case, genotyping
+results.
+
+The `RangedSummarizedExperiment` class is exactly like `SummarizedExperiment`,
+except that each assay is associated with a location within the genome.  This
+makes sense for our variant data, where each "assay" is a SNP.  It also makes
+sense for gene expression data, where each gene has a location within the
+genome.  Below we'll load an example expression dataset from Bioconductor.
+
+```{r}
+data(airway, package="airway")
+
+airway
+```
+
+We can see that there are row names that are gene identities, and column names
+that are sample identifiers.  There are eight samples and 64,102 genes.
+One handy thing about the printout is that it lists functions we can use to
+access the data.  Here's some metadata about the samples:
+
+```{r}
+colData(airway)
+```
+
+And the read counts for gene expression (I am using the `head` function to avoid
+printing them all out):
+
+```{r}
+assays(airway)$counts %>% head(10)
+```
+
+> ## Challenge: Gene and sample names
+>
+> If you wanted a vector of gene IDs or a vector of sample names, what functions
+> can you use to get those?
+>
+> > ## Solution
+> > 
+> > ```{r}
+> > geneids <- rownames(airway)
+> > head(geneids, 10)
+> > samples <- colnames(airway)
+> > samples
+> > ```
+> >
+> > It also wouldn't be wrong, just more complicated, to get them like this:
+> >
+> > ```{r}
+> > geneids <- rownames(assays(airway)$counts)
+> > samples <- colnames(assays(airway)$counts)
+> > ```
+> {: .solution}
+{: .challenge}
+
+The `rowRanges` function gets us the `GRanges` object associated with each gene.
+
+```{r}
+rowRanges(airway)
+```
+
+The first gene is on the X chromosome.  All the exons are listed individually.
+Because of this, the `GRanges` for each gene are compiled into a `GRangesList`
+for the whole dataset.  The use of `GRanges` means we could subset the whole
+dataset by genomic position.  Let's say we're just interested in a certain
+region of chromosome 4:
+
+```{r}
+myregion <- GRanges("4", IRanges(start = 82660000, end = 119280000))
+
+airway4 <- subsetByOverlaps(airway, myregion)
+
+airway4
+
+rowRanges(airway4)
+```
+
+Now we just have 458 genes in that region.
+
+In the next episode, we will import data from a VCF.
+
+{% include links.md %}
