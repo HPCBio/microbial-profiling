@@ -46,8 +46,8 @@ and to meet some of our community members.
 ## Where to Contribute
 
 1.  If you wish to change this lesson,
-    please work in <https://github.com/HPCBio/variant-analysis-workshop>,
-    which can be viewed at <https://HPCBio.github.io/variant-analysis-workshop>.
+    please work in <https://github.com/HPCBio/microbial-profiling/>,
+    which can be viewed at <https://github.com/HPCBio/microbial-profiling/>.
 
 2.  If you wish to change the example lesson,
     please work in <https://github.com/carpentries/lesson-example>,
